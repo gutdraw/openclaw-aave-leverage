@@ -1,0 +1,217 @@
+---
+name: aave-leverage-agent
+description: Open and manage leveraged DeFi positions on Aave v3 (Base) — BTC long, ETH long, shorts, and more. Non-custodial. Atomic. One transaction.
+version: 1.0.0
+author: gutdraw
+tags: [defi, aave, leverage, base, crypto, trading, flash-loan, uniswap]
+requires_mcp: aave-leverage
+---
+
+# Aave Leverage Agent
+
+Open 2x–5x leveraged positions on Aave v3 (Base mainnet) in a single atomic transaction.
+Uses Aave flash loans + Uniswap v3 swaps. Non-custodial — positions live entirely in your wallet.
+
+## What you can do
+
+- Open a leveraged long (BTC, ETH, wstETH)
+- Open a leveraged short (ETH, BTC)
+- Check your position health factor and liquidation price
+- Close a position fully
+- Partially close a position
+- Reduce leverage in-place (no close/reopen)
+- Increase leverage in-place
+- Swap tokens (ETH, USDC, cbBTC, WETH, wstETH)
+
+## Supported strategies
+
+| Strategy      | Supply  | Borrow | Max leverage |
+|---------------|---------|--------|--------------|
+| Long ETH      | WETH    | USDC   | 4.5x         |
+| Long wstETH   | wstETH  | WETH   | 4.3x         |
+| Long BTC      | cbBTC   | USDC   | 3.3x         |
+| Short ETH     | USDC    | WETH   | 4.5x         |
+| Short BTC     | USDC    | cbBTC  | 4.5x         |
+
+## Setup — MCP session (one-time per session)
+
+Before using any tool, you need an active MCP session. Sessions are paid in USDC on Base
+via x402. The session is wallet-bound.
+
+Pricing:
+- $0.01 / hour
+- $0.10 / day
+- $0.50 / week
+
+The MCP server will prompt for payment automatically on first tool call.
+Funds are sent on-chain — check your USDC balance on Base before starting.
+
+## How to use
+
+### 1. Check position state
+
+Use `get_position` to see current Aave balances, health factor, and token balances:
+
+```
+get_position(user_address: "0xYOUR_WALLET")
+```
+
+Returns: health factor, LTV, total collateral (USD), total debt (USD), token balances.
+
+### 2. Open a position — natural language (recommended)
+
+Use `chat` with a plain English description:
+
+```
+chat(
+  message: "open a 3x BTC long using 0.001 cbBTC as seed",
+  user_address: "0xYOUR_WALLET"
+)
+```
+
+```
+chat(
+  message: "open a 2x ETH long with 0.01 ETH",
+  user_address: "0xYOUR_WALLET"
+)
+```
+
+```
+chat(
+  message: "open a 3x short on ETH using $50 USDC",
+  user_address: "0xYOUR_WALLET"
+)
+```
+
+The response contains:
+- `reply`: human-readable explanation of the plan
+- `transaction_steps`: ordered list of steps to sign and submit
+- `summary`: position details (leverage, collateral, debt, health factor, liquidation price)
+
+### 3. Open a position — structured (for bots)
+
+Use `prepare_open` for programmatic control:
+
+```
+prepare_open(
+  user_address: "0xYOUR_WALLET",
+  leverage: 3.0,
+  amount: 0.001,
+  supply_asset: "cbBTC",
+  borrow_asset: "USDC"
+)
+```
+
+### 4. Execute transaction steps
+
+Each step in `transaction_steps` must be signed and submitted in order.
+Each step contains:
+- `type`: approve / approveDelegation / openPosition / closePosition / swap
+- `contract`: verified contract address
+- `abi_fn`: function signature
+- `args`: call arguments (already in atomic units)
+- `gas`: gas limit
+- `provenance`: raw QuoterV2 inputs for independent verification (see Safety section)
+
+**ALWAYS verify before signing** — see Safety section below.
+
+### 5. Close a position
+
+```
+chat(
+  message: "close my BTC position",
+  user_address: "0xYOUR_WALLET"
+)
+```
+
+Or structured:
+```
+prepare_close(
+  user_address: "0xYOUR_WALLET",
+  position_id: "cbBTC/USDC"
+)
+```
+
+### 6. Adjust leverage
+
+Reduce without closing:
+```
+prepare_reduce(
+  user_address: "0xYOUR_WALLET",
+  supply_asset: "WETH",
+  borrow_asset: "USDC",
+  target_leverage: 2.0
+)
+```
+
+Increase without closing:
+```
+prepare_increase(
+  user_address: "0xYOUR_WALLET",
+  supply_asset: "WETH",
+  borrow_asset: "USDC",
+  target_leverage: 4.0
+)
+```
+
+### 7. Swap tokens
+
+```
+swap(
+  token_in: "ETH",
+  token_out: "cbBTC",
+  amount_in: "0.002",
+  user_address: "0xYOUR_WALLET"
+)
+```
+
+## Safety — verify before signing
+
+Every transaction step includes a `provenance` block with the exact inputs used to
+compute the quoted `minOut` / `maxIn`. Before signing any openPosition or closePosition,
+verify the quote independently using your own RPC:
+
+```js
+// verify/verify-quote.js — included in this skill repo
+node verify/verify-quote.js --provenance '<provenance JSON>' --rpc 'https://mainnet.base.org'
+```
+
+The script calls QuoterV2 (`0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a`) with the same
+inputs and checks the result is within 1% of the server's quote.
+
+**Hard rules — never sign a step if:**
+- `step.contract` is not the known router (`0x7a7956cb5954588188601A612c820df64ecd23D6`)
+  or vault (`0x6698A041bA23A8d4b2c91200859475e88A969f07`) or a token address
+- The provenance quote differs by more than 1% from your independent check
+- The resulting health factor would drop below 1.2
+
+## Verified contracts (Base mainnet)
+
+| Contract          | Address                                      | Basescan |
+|-------------------|----------------------------------------------|----------|
+| LeverageRouterV3  | `0x7a7956cb5954588188601A612c820df64ecd23D6` | [view](https://basescan.org/address/0x7a7956cb5954588188601A612c820df64ecd23D6#code) |
+| LeverageVaultV3   | `0x6698A041bA23A8d4b2c91200859475e88A969f07` | [view](https://basescan.org/address/0x6698A041bA23A8d4b2c91200859475e88A969f07#code) |
+| Uniswap QuoterV2  | `0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a` | Base mainnet |
+| Aave v3 Pool      | `0xA238Dd80C259a72e81d7e4664a9801593F98d1c5` | Base mainnet |
+
+All contracts are open-source and verified on Basescan.
+
+## Fees
+
+| Fee             | Amount               | Paid to           |
+|-----------------|----------------------|-------------------|
+| Aave flash loan | 0.09% of flash amt   | Aave protocol     |
+| Uniswap swap    | 0.05% pool fee       | Uniswap LPs       |
+| Protocol fee    | 0.10% of seed        | Protocol operator |
+| Gas (Base)      | ~$0.01–$0.05 per tx  | Base validators   |
+| MCP session     | $0.01/hr             | API operator      |
+
+## Error handling
+
+| Error                        | Meaning                                      | Fix                              |
+|------------------------------|----------------------------------------------|----------------------------------|
+| `seed too small (< $1)`      | Seed collateral worth less than $1           | Use a larger seed amount         |
+| `swap quote failed (503)`    | RPC rate limit on QuoterV2                   | Retry after 10–15 seconds        |
+| `leverage exceeds safe max`  | Requested leverage above Aave LTV cap        | Use the suggested safe maximum   |
+| `health factor too low`      | Position would be near liquidation           | Reduce leverage                  |
+| `RPC unavailable`            | Base RPC timeout                             | Retry — transient                |

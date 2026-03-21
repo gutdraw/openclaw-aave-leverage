@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "aave-leverage": {
+      "url": "https://YOUR-RAILWAY-URL/mcp",
+      "headers": {
+        "X-Wallet-Address": "YOUR_WALLET_ADDRESS"
+      }
+    }
+  }
+}
