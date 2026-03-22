@@ -50,13 +50,20 @@ Funds are sent on-chain — check your USDC balance on Base before starting.
 
 ### 1. Check position state
 
-Use `get_position` to see current Aave balances, health factor, and token balances:
+Use `get_position` to see your full position state:
 
 ```
 get_position(user_address: "0xYOUR_WALLET")
 ```
 
-Returns: health factor, LTV, total collateral (USD), total debt (USD), token balances.
+Returns:
+- `health_factor`, `ltv`, `total_collateral_usd`, `total_debt_usd`, `available_borrows`
+- `positions[]` — per-position breakdown: direction, leverage, collateral, debt, liquidation price
+- `balances{}` — wallet token balances (ETH, WETH, USDC, wstETH, cbBTC) with USD values
+- `rates{}` — live Aave interest rates per asset: `supplyApy`, `borrowApy`, `carryCost`
+
+The `rates` field is useful for calculating the ongoing cost of holding a leveraged position
+before opening it, and for monitoring carry cost over time.
 
 ### 2. Open a position — natural language (recommended)
 
