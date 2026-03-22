@@ -9,7 +9,7 @@ requires_mcp: aave-leverage
 
 # Aave Leverage Agent
 
-> **Beta software — unaudited.** The contracts have not been independently audited. Do not deposit funds you cannot afford to lose. This is not financial advice.
+> **Beta — contracts not yet independently audited.** All contract source is fully verified and open source on Basescan. Before opening a position, you and your agent should read the contracts — every security property is verifiable on-chain.
 
 Open 2x–5x leveraged positions on Aave v3 (Base mainnet) in a single atomic transaction.
 Uses Aave flash loans + Uniswap v3 swaps. Non-custodial — positions live entirely in your wallet.
