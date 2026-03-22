@@ -33,18 +33,40 @@ Uses Aave flash loans + Uniswap v3 swaps. Non-custodial — positions live entir
 | Short ETH     | USDC    | WETH   | 4.5x         |
 | Short BTC     | USDC    | cbBTC  | 4.5x         |
 
-## Setup — MCP session (one-time per session)
+## Setup — MCP session
 
 Before using any tool, you need an active MCP session. Sessions are paid in USDC on Base
-via x402. The session is wallet-bound.
+via the x402 payment protocol. The session is wallet-bound — tied to the
+`X-Wallet-Address` header in `mcp-config.json`.
 
-Pricing:
-- $0.01 / hour
-- $0.10 / day
-- $0.50 / week
+**Pricing:**
 
-The MCP server will prompt for payment automatically on first tool call.
-Funds are sent on-chain — check your USDC balance on Base before starting.
+| Duration | Cost |
+|----------|------|
+| 1 hour   | $0.01 |
+| 1 day    | $0.10 |
+| 1 week   | $0.50 |
+
+**How x402 works:**
+
+On your first tool call, the MCP server returns an HTTP 402 (Payment Required) response
+containing a payment request — the amount, the recipient address, and the chain (Base).
+OpenClaw handles this automatically: it signs a USDC transfer from your wallet, submits
+it on-chain, and retries the original tool call once payment is confirmed.
+
+This means the first tool call of a session takes longer than usual (~10–30s) while
+the payment transaction confirms. Subsequent calls in the same session are instant.
+
+**What the agent should know:**
+
+- If a tool call fails with a payment error, it means the session has expired or the
+  wallet has insufficient USDC. Check the USDC balance on Base and retry.
+- Sessions do not auto-renew. A new session starts (and payment is triggered again)
+  when the previous one expires.
+- The web UI at `https://leverage.getclaw.xyz` is free — x402 applies to
+  programmatic/agent access only.
+- Ensure the wallet in `X-Wallet-Address` has enough USDC on Base before starting.
+  $1 is enough for days of use.
 
 ## How to use
 
