@@ -81,18 +81,28 @@ function parseArgs() {
   return result;
 }
 
+// Resolve cast binary: prefer system PATH, fall back to default Foundry install location
+function resolveCast() {
+  try {
+    execSync("cast --version 2>/dev/null", { encoding: "utf8" });
+    return "cast";
+  } catch {
+    return `${process.env.HOME}/.foundry/bin/cast`;
+  }
+}
+
 async function callQuoter(rpc, fn, params) {
-  // Use cast (Foundry) if available, otherwise fall back to eth_call via curl
+  const cast = resolveCast();
   try {
     if (fn === "quoteExactInputSingle") {
-      const cmd = `~/.foundry/bin/cast call ${QUOTER_V2} \
+      const cmd = `${cast} call ${QUOTER_V2} \
         "quoteExactInputSingle((address,address,uint256,uint24,uint160))(uint256,uint160,uint32,uint256)" \
         "(${params.tokenIn},${params.tokenOut},${params.amountIn},${params.fee},0)" \
         --rpc-url ${rpc} 2>/dev/null`;
       const out = execSync(cmd, { encoding: "utf8" }).trim();
       return BigInt(out.split("\n")[0].split(" ")[0]);
     } else {
-      const cmd = `~/.foundry/bin/cast call ${QUOTER_V2} \
+      const cmd = `${cast} call ${QUOTER_V2} \
         "quoteExactOutputSingle((address,address,uint256,uint24,uint160))(uint256,uint160,uint32,uint256)" \
         "(${params.tokenIn},${params.tokenOut},${params.amount},${params.fee},0)" \
         --rpc-url ${rpc} 2>/dev/null`;

@@ -1,10 +1,11 @@
 {
   "mcpServers": {
     "aave-leverage": {
-      "url": "https://YOUR-RAILWAY-URL/mcp",
+      "url": "https://aave-leverage-agent-production.up.railway.app/mcp",
       "headers": {
-        "X-Wallet-Address": "YOUR_WALLET_ADDRESS"
+        "X-Wallet-Address": "0xYOUR_WALLET_ADDRESS"
       }
     }
   }
 }
+

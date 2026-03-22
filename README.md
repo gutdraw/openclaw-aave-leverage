@@ -25,13 +25,15 @@ Supported strategies: Long ETH, Long wstETH, Long BTC, Short ETH, Short BTC.
 
 ### 1. Add the MCP server to OpenClaw
 
-Copy `mcp-config.json` and add it to your `openclaw.json`:
+Copy `mcp-config.json` and add it to your `openclaw.json`.
+
+> **Changing the server URL?** Edit only `mcp-config.json` — that is the single source of truth for the endpoint.
 
 ```json
 {
   "mcpServers": {
     "aave-leverage": {
-      "url": "https://YOUR-RAILWAY-URL/mcp",
+      "url": "https://aave-leverage-agent-production.up.railway.app/mcp",
       "headers": {
         "X-Wallet-Address": "0xYOUR_WALLET_ADDRESS"
       }
@@ -69,7 +71,7 @@ This calls Uniswap's QuoterV2 (`0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a`) dir
 **Never sign a step if:**
 - `step.contract` is not the known router or vault (see below)
 - The provenance quote differs by more than 1% from your independent check
-- The resulting health factor would drop below 1.2
+- The resulting health factor would drop below 1.1 (server enforces this)
 
 ---
 

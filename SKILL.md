@@ -65,21 +65,24 @@ Use `chat` with a plain English description:
 ```
 chat(
   message: "open a 3x BTC long using 0.001 cbBTC as seed",
-  user_address: "0xYOUR_WALLET"
+  user_address: "0xYOUR_WALLET",
+  history: []          // optional — pass prior turns for multi-turn sessions
 )
 ```
 
 ```
 chat(
   message: "open a 2x ETH long with 0.01 ETH",
-  user_address: "0xYOUR_WALLET"
+  user_address: "0xYOUR_WALLET",
+  history: []          // optional — pass prior turns for multi-turn sessions
 )
 ```
 
 ```
 chat(
   message: "open a 3x short on ETH using $50 USDC",
-  user_address: "0xYOUR_WALLET"
+  user_address: "0xYOUR_WALLET",
+  history: []          // optional — pass prior turns for multi-turn sessions
 )
 ```
 
@@ -96,9 +99,9 @@ Use `prepare_open` for programmatic control:
 prepare_open(
   user_address: "0xYOUR_WALLET",
   leverage: 3.0,
-  amount: 0.001,
-  supply_asset: "cbBTC",
-  borrow_asset: "USDC"
+  amount: 0.001,        // optional — omit to use existing wallet balance
+  supply_asset: "cbBTC", // optional — symbol or address
+  borrow_asset: "USDC"   // optional — symbol or address
 )
 ```
 
@@ -140,7 +143,8 @@ prepare_reduce(
   user_address: "0xYOUR_WALLET",
   supply_asset: "WETH",
   borrow_asset: "USDC",
-  target_leverage: 2.0
+  target_leverage: 2.0,
+  swap_fee: 500         // optional — Uniswap fee tier (100/500/3000), default 500
 )
 ```
 
@@ -150,7 +154,8 @@ prepare_increase(
   user_address: "0xYOUR_WALLET",
   supply_asset: "WETH",
   borrow_asset: "USDC",
-  target_leverage: 4.0
+  target_leverage: 4.0,
+  swap_fee: 500         // optional — Uniswap fee tier (100/500/3000), default 500
 )
 ```
 
@@ -183,7 +188,7 @@ inputs and checks the result is within 1% of the server's quote.
 - `step.contract` is not the known router (`0x7a7956cb5954588188601A612c820df64ecd23D6`)
   or vault (`0x6698A041bA23A8d4b2c91200859475e88A969f07`) or a token address
 - The provenance quote differs by more than 1% from your independent check
-- The resulting health factor would drop below 1.2
+- The resulting health factor would drop below 1.1 (server enforces this)
 
 ## Verified contracts (Base mainnet)
 
@@ -215,3 +220,14 @@ All contracts are open-source and verified on Basescan.
 | `leverage exceeds safe max`  | Requested leverage above Aave LTV cap        | Use the suggested safe maximum   |
 | `health factor too low`      | Position would be near liquidation           | Reduce leverage                  |
 | `RPC unavailable`            | Base RPC timeout                             | Retry — transient                |
+
+## Agent behavior
+
+Guidelines for any agent using this skill in an interactive session:
+
+- **Always call `get_position` first** before suggesting or executing anything.
+- **Never suggest leverage above 3x** unless the user has explicitly stated their risk appetite.
+- **Always surface liquidation price in dollar terms** before opening a position — not just the health factor number.
+- **Warn, don't just refuse** if the user requests leverage that would put HF below 1.3. Explain in concrete terms: "ETH only needs to drop $X to liquidate you."
+- **Proactively flag HF < 1.4** at the start of any session — offer options (add collateral, reduce leverage, close) before doing anything else.
+- **Call `get_position` after every completed transaction** and report what changed (new HF, new liquidation price, new collateral/debt).

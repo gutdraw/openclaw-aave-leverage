@@ -132,6 +132,6 @@ The agent returns close steps. Verify the provenance quote for the close step, t
 
 - Minimum seed: ~$1 worth of cbBTC
 - Max leverage: 3.3x for cbBTC/USDC (Aave LTV cap)
-- Health factor below 1.2 will be rejected by the server
+- Health factor below 1.1 will be rejected by the server
 - If BTC pumps, your health factor rises — position becomes safer
 - If BTC dumps below liquidation price, Aave liquidators will close it for you (with penalty)
