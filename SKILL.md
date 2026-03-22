@@ -221,6 +221,14 @@ All contracts are open-source and verified on Basescan.
 | `health factor too low`      | Position would be near liquidation           | Reduce leverage                  |
 | `RPC unavailable`            | Base RPC timeout                             | Retry — transient                |
 
+## Wallet security
+
+- **Use a dedicated bot wallet** — never use your main wallet with this skill. Create a separate address funded only with what you need for the current strategy. If something goes wrong, the blast radius is contained.
+- **Never put your private key in any file in this repo** — not in `config.yml`, not in `mcp-config.json`, not anywhere. Your private key belongs only in OpenClaw's secure key store (or your hardware wallet / connected wallet app).
+- **Minimum funding principle** — only bridge to the bot wallet what you need: enough collateral to open your intended position plus a small ETH buffer for gas (~$2–5 on Base). Nothing more.
+- **`user_address` is a public address** — it is safe to store in `config.yml` and MCP headers. It is not a secret.
+- **Revoke approvals when done** — after closing a position, revoke the router's ERC20 allowances. The `approve` steps grant `uint256 max` by default. Use a tool like Revoke.cash on Base.
+
 ## Agent behavior
 
 Guidelines for any agent using this skill in an interactive session:
