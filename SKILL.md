@@ -41,11 +41,12 @@ via the x402 payment protocol. The session is wallet-bound — tied to the
 
 **Pricing:**
 
-| Duration | Cost |
-|----------|------|
-| 1 hour   | $0.01 |
-| 1 day    | $0.10 |
-| 1 week   | $0.50 |
+| Duration | Cost | Best for |
+|----------|------|----------|
+| 1 hour   | $0.05 | Testing, one-shot tasks |
+| 1 day    | $0.25 | Standard use |
+| 1 week   | $1.50 | Power users |
+| 1 month  | $4.00 | Production bots, cron jobs |
 
 **How x402 works:**
 

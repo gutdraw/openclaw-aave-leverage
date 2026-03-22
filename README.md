@@ -92,11 +92,12 @@ All contracts are open-source and verified on [Basescan](https://basescan.org).
 
 The MCP server uses the x402 payment protocol. Sessions are wallet-bound and paid in USDC on Base.
 
-| Duration | Price |
-|----------|-------|
-| 1 hour | $0.01 |
-| 1 day | $0.10 |
-| 1 week | $0.50 |
+| Duration | Price | Best for |
+|----------|-------|----------|
+| 1 hour | $0.05 | Testing, one-shot tasks |
+| 1 day | $0.25 | Standard use |
+| 1 week | $1.50 | Power users |
+| 1 month | $4.00 | Production bots, cron jobs |
 
 Payment is automatic on first tool call. The web UI at [leverage.getclaw.xyz](https://leverage.getclaw.xyz) is free — x402 is for programmatic/agent access only.
 
