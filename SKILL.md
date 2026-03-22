@@ -25,13 +25,15 @@ Uses Aave flash loans + Uniswap v3 swaps. Non-custodial — positions live entir
 
 ## Supported strategies
 
-| Strategy      | Supply  | Borrow | Max leverage |
-|---------------|---------|--------|--------------|
-| Long ETH      | WETH    | USDC   | 4.5x         |
-| Long wstETH   | wstETH  | WETH   | 4.3x         |
-| Long BTC      | cbBTC   | USDC   | 3.3x         |
-| Short ETH     | USDC    | WETH   | 4.5x         |
-| Short BTC     | USDC    | cbBTC  | 4.5x         |
+| Strategy      | Supply  | Borrow | Max leverage | Carry cost (approx) |
+|---------------|---------|--------|--------------|---------------------|
+| Long ETH      | WETH    | USDC   | 4.5x         | ~USDC borrow APY    |
+| Long wstETH   | wstETH  | WETH   | 4.3x         | Near zero (staking yield offsets borrow) |
+| Long BTC      | cbBTC   | USDC   | 3.3x         | ~USDC borrow APY    |
+| Short ETH     | USDC    | WETH   | 4.5x         | ~WETH borrow APY    |
+| Short BTC     | USDC    | cbBTC  | 4.5x         | ~cbBTC borrow APY   |
+
+Call `get_position` to see live `reserveRates` for each asset before opening — it shows current `borrowApy`, `supplyApy`, and `carryCost` so you know the exact ongoing cost of holding.
 
 ## Setup — MCP session
 
@@ -226,20 +228,20 @@ inputs and checks the result is within 1% of the server's quote.
 |-------------------|----------------------------------------------|----------|
 | LeverageRouterV3  | `0x7a7956cb5954588188601A612c820df64ecd23D6` | [view](https://basescan.org/address/0x7a7956cb5954588188601A612c820df64ecd23D6#code) |
 | LeverageVaultV3   | `0x6698A041bA23A8d4b2c91200859475e88A969f07` | [view](https://basescan.org/address/0x6698A041bA23A8d4b2c91200859475e88A969f07#code) |
-| Uniswap QuoterV2  | `0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a` | Base mainnet |
-| Aave v3 Pool      | `0xA238Dd80C259a72e81d7e4664a9801593F98d1c5` | Base mainnet |
+| Uniswap QuoterV2  | `0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a` | [view](https://basescan.org/address/0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a#code) |
+| Aave v3 Pool      | `0xA238Dd80C259a72e81d7e4664a9801593F98d1c5` | [view](https://basescan.org/address/0xA238Dd80C259a72e81d7e4664a9801593F98d1c5#code) |
 
 All contracts are open-source and verified on Basescan.
 
 ## Fees
 
-| Fee             | Amount               | Paid to           |
-|-----------------|----------------------|-------------------|
-| Aave flash loan | 0.09% of flash amt   | Aave protocol     |
-| Uniswap swap    | 0.05% pool fee       | Uniswap LPs       |
-| Protocol fee    | 0.10% of seed        | Protocol operator |
-| Gas (Base)      | ~$0.01–$0.05 per tx  | Base validators   |
-| MCP session     | $0.01/hr             | API operator      |
+| Fee             | Amount                                          | Paid to           |
+|-----------------|-------------------------------------------------|-------------------|
+| Aave flash loan | 0.09% of flash amount                           | Aave protocol     |
+| Uniswap swap    | 0.05% pool fee                                  | Uniswap LPs       |
+| Protocol fee    | 0.10% of seed                                   | Protocol operator |
+| Gas (Base)      | ~$0.01–$0.05 per tx                             | Base validators   |
+| MCP session     | $0.05/hr · $0.25/day · $1.50/week · $4.00/month | API operator      |
 
 ## Error handling
 
@@ -269,3 +271,5 @@ Guidelines for any agent using this skill in an interactive session:
 - **Warn, don't just refuse** if the user requests leverage that would put HF below 1.3. Explain in concrete terms: "ETH only needs to drop $X to liquidate you."
 - **Proactively flag HF < 1.4** at the start of any session — offer options (add collateral, reduce leverage, close) before doing anything else.
 - **Call `get_position` after every completed transaction** and report what changed (new HF, new liquidation price, new collateral/debt).
+- **Surface carry cost before opening** — use `reserveRates[borrowAsset].borrowApy` to tell the user what they'll pay annually to hold the position. For a 3x BTC long at 3.86% USDC borrow APY, BTC needs to outperform ~3.86%/yr just to break even.
+- **Recommend wstETH loop for low carry** — the wstETH/WETH strategy earns staking yield on the collateral that largely offsets the borrow rate, making it the most cost-efficient long strategy.
