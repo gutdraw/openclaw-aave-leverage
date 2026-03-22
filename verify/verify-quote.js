@@ -16,7 +16,24 @@
  *   1 — quote mismatch or error, do NOT sign
  */
 
-const { execSync } = require("child_process");
+const { spawnSync } = require("child_process");
+
+/** Validate RPC URL to prevent shell injection when passed to cast. */
+function validateRpc(url) {
+  try {
+    const parsed = new URL(url);
+    if (!["http:", "https:", "ws:", "wss:"].includes(parsed.protocol)) {
+      throw new Error(`Unsupported RPC protocol: ${parsed.protocol}`);
+    }
+    // Reject any shell metacharacters that could escape argument quoting
+    if (/[\s;&|`$<>'"\\]/.test(url)) {
+      throw new Error("RPC URL contains invalid characters");
+    }
+    return url;
+  } catch (e) {
+    throw new Error(`Invalid --rpc URL: ${e.message}`);
+  }
+}
 
 const QUOTER_V2 = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
 
@@ -75,7 +92,7 @@ function parseArgs() {
   const result = { rpc: "https://mainnet.base.org", toleranceBps: 100 };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--provenance") result.provenance = JSON.parse(args[++i]);
-    if (args[i] === "--rpc") result.rpc = args[++i];
+    if (args[i] === "--rpc") result.rpc = validateRpc(args[++i]);
     if (args[i] === "--tolerance") result.toleranceBps = parseInt(args[++i]);
   }
   return result;
@@ -83,37 +100,43 @@ function parseArgs() {
 
 // Resolve cast binary: prefer system PATH, fall back to default Foundry install location
 function resolveCast() {
-  try {
-    execSync("cast --version 2>/dev/null", { encoding: "utf8" });
-    return "cast";
-  } catch {
+  const result = spawnSync("cast", ["--version"], { encoding: "utf8" });
+  if (result.error || result.status !== 0) {
     return `${process.env.HOME}/.foundry/bin/cast`;
   }
+  return "cast";
 }
 
 async function callQuoter(rpc, fn, params) {
   const cast = resolveCast();
-  try {
-    if (fn === "quoteExactInputSingle") {
-      const cmd = `${cast} call ${QUOTER_V2} \
-        "quoteExactInputSingle((address,address,uint256,uint24,uint160))(uint256,uint160,uint32,uint256)" \
-        "(${params.tokenIn},${params.tokenOut},${params.amountIn},${params.fee},0)" \
-        --rpc-url ${rpc} 2>/dev/null`;
-      const out = execSync(cmd, { encoding: "utf8" }).trim();
-      return BigInt(out.split("\n")[0].split(" ")[0]);
-    } else {
-      const cmd = `${cast} call ${QUOTER_V2} \
-        "quoteExactOutputSingle((address,address,uint256,uint24,uint160))(uint256,uint160,uint32,uint256)" \
-        "(${params.tokenIn},${params.tokenOut},${params.amount},${params.fee},0)" \
-        --rpc-url ${rpc} 2>/dev/null`;
-      const out = execSync(cmd, { encoding: "utf8" }).trim();
-      return BigInt(out.split("\n")[0].split(" ")[0]);
-    }
-  } catch (e) {
+  let sig, tuple;
+  if (fn === "quoteExactInputSingle") {
+    sig =
+      "quoteExactInputSingle((address,address,uint256,uint24,uint160))(uint256,uint160,uint32,uint256)";
+    tuple = `(${params.tokenIn},${params.tokenOut},${params.amountIn},${params.fee},0)`;
+  } else {
+    sig =
+      "quoteExactOutputSingle((address,address,uint256,uint24,uint160))(uint256,uint160,uint32,uint256)";
+    tuple = `(${params.tokenIn},${params.tokenOut},${params.amount},${params.fee},0)`;
+  }
+
+  // Use spawnSync with args array — no shell interpolation, safe against injection
+  const result = spawnSync(
+    cast,
+    ["call", QUOTER_V2, sig, tuple, "--rpc-url", rpc],
+    { encoding: "utf8" },
+  );
+
+  if (result.error || result.status !== 0) {
+    const msg = result.error
+      ? result.error.message
+      : (result.stderr || "").trim();
     throw new Error(
-      `cast call failed: ${e.message}. Make sure Foundry is installed: https://getfoundry.sh`,
+      `cast call failed: ${msg}. Make sure Foundry is installed: https://getfoundry.sh`,
     );
   }
+
+  return BigInt(result.stdout.trim().split("\n")[0].split(" ")[0]);
 }
 
 async function main() {

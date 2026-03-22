@@ -9,6 +9,8 @@ requires_mcp: aave-leverage
 
 # Aave Leverage Agent
 
+> **Beta software — unaudited.** The contracts have not been independently audited. Do not deposit funds you cannot afford to lose. This is not financial advice.
+
 Open 2x–5x leveraged positions on Aave v3 (Base mainnet) in a single atomic transaction.
 Uses Aave flash loans + Uniswap v3 swaps. Non-custodial — positions live entirely in your wallet.
 
