@@ -1,0 +1,289 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "get_position",
+      "description": "Fetch the user's current Aave v3 position on Base. Returns health factor, LTV, collateral/debt totals, per-position breakdown, wallet token balances, and live borrow/supply APYs. Always call this first before suggesting or executing any trade.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_address": {
+            "type": "string",
+            "description": "User's EVM wallet address (0x...)"
+          }
+        },
+        "required": ["user_address"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "chat",
+      "description": "Handle a natural-language leverage intent: 'open a 3x BTC long using 0.001 cbBTC', 'close my ETH position', 'show my health factor'. Returns a human-readable reply plus ordered transaction_steps to sign. Best for interactive sessions.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "User's natural language instruction (e.g. 'open a 3x ETH long with 0.01 ETH')"
+          },
+          "user_address": {
+            "type": "string",
+            "description": "User's EVM wallet address (0x...)"
+          },
+          "history": {
+            "type": "array",
+            "description": "Optional prior conversation turns [{role, content}] for multi-turn context",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": { "type": "string", "enum": ["user", "assistant"] },
+                "content": { "type": "string" }
+              },
+              "required": ["role", "content"]
+            }
+          }
+        },
+        "required": ["message", "user_address"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "prepare_open",
+      "description": "Build transaction steps to open a leveraged long position on Aave v3. Returns ordered steps to sign: token approvals + flash-loan open. Use this for programmatic bots; use chat() for interactive sessions.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_address": {
+            "type": "string",
+            "description": "User's EVM wallet address (0x...)"
+          },
+          "leverage": {
+            "type": "number",
+            "description": "Target leverage multiplier (e.g. 3.0 = 3x). Max depends on asset LTV: WETH ~4.5x, cbBTC ~3.3x, wstETH ~4.3x."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Seed amount in asset units (e.g. 0.001 for 0.001 cbBTC). Omit to use full wallet balance."
+          },
+          "supply_asset": {
+            "type": "string",
+            "description": "Asset to supply as collateral: WETH, cbBTC, or wstETH. Default: WETH."
+          },
+          "borrow_asset": {
+            "type": "string",
+            "description": "Asset to borrow: USDC (for longs) or WETH/cbBTC (for shorts). Default: USDC."
+          }
+        },
+        "required": ["user_address", "leverage"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "prepare_close",
+      "description": "Build transaction steps to fully close an existing leveraged position. Repays all debt via flash loan and withdraws collateral in one atomic transaction.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_address": {
+            "type": "string",
+            "description": "User's EVM wallet address (0x...)"
+          },
+          "position_id": {
+            "type": "string",
+            "description": "Position identifier: 'WETH/USDC', 'cbBTC/USDC', or 'wstETH/WETH'"
+          }
+        },
+        "required": ["user_address", "position_id"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "prepare_reduce",
+      "description": "Build transaction steps to reduce leverage on an open position without fully closing it. Partially repays debt to reach the target leverage.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_address": {
+            "type": "string",
+            "description": "User's EVM wallet address (0x...)"
+          },
+          "supply_asset": {
+            "type": "string",
+            "description": "Collateral asset symbol: WETH, cbBTC, or wstETH"
+          },
+          "borrow_asset": {
+            "type": "string",
+            "description": "Debt asset symbol: USDC, WETH, or cbBTC"
+          },
+          "target_leverage": {
+            "type": "number",
+            "description": "Target leverage after reduction (e.g. 2.0). Must be lower than current leverage."
+          },
+          "swap_fee": {
+            "type": "integer",
+            "description": "Uniswap v3 pool fee tier in bps: 100, 500 (default), or 3000",
+            "enum": [100, 500, 3000]
+          }
+        },
+        "required": ["user_address", "supply_asset", "borrow_asset", "target_leverage"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "prepare_increase",
+      "description": "Build transaction steps to increase leverage on an open position without closing it. Borrows more and supplies more collateral to reach the target leverage.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_address": {
+            "type": "string",
+            "description": "User's EVM wallet address (0x...)"
+          },
+          "supply_asset": {
+            "type": "string",
+            "description": "Collateral asset symbol: WETH, cbBTC, or wstETH"
+          },
+          "borrow_asset": {
+            "type": "string",
+            "description": "Debt asset symbol: USDC, WETH, or cbBTC"
+          },
+          "target_leverage": {
+            "type": "number",
+            "description": "Target leverage after increase (e.g. 4.0). Must be higher than current leverage and below asset max."
+          },
+          "swap_fee": {
+            "type": "integer",
+            "description": "Uniswap v3 pool fee tier in bps: 100, 500 (default), or 3000",
+            "enum": [100, 500, 3000]
+          }
+        },
+        "required": ["user_address", "supply_asset", "borrow_asset", "target_leverage"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "swap",
+      "description": "Swap tokens via Uniswap v3 on Base mainnet. Returns a transaction step to sign.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_address": {
+            "type": "string",
+            "description": "User's EVM wallet address (0x...)"
+          },
+          "token_in": {
+            "type": "string",
+            "description": "Input token symbol or address: ETH, WETH, USDC, cbBTC, wstETH"
+          },
+          "token_out": {
+            "type": "string",
+            "description": "Output token symbol or address: ETH, WETH, USDC, cbBTC, wstETH"
+          },
+          "amount_in": {
+            "type": "string",
+            "description": "Amount to swap in human units (e.g. '0.002' for 0.002 ETH)"
+          }
+        },
+        "required": ["user_address", "token_in", "token_out", "amount_in"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "analyze_performance",
+      "description": "Analyze the strategy's historical performance from trades.jsonl. Returns win rate overall and by signal type, total/avg/best/worst P&L, filter hit rates, avg hold time, max drawdown, open position snapshot, and actionable improvement hints. Call this before proposing any config changes.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "server": "http://localhost:8001/tools/analyze_performance"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "backtest",
+      "description": "Replay the recorded price history with alternative parameters and return simulated P&L. Use compare_to_baseline=true to get a side-by-side delta between current and proposed settings. Always run this before calling update_config to verify a proposed change would actually improve performance.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "take_profit_pct": {
+            "type": "number",
+            "description": "Take-profit threshold % to test (e.g. 7.0)"
+          },
+          "stop_loss_pct": {
+            "type": "number",
+            "description": "Stop-loss threshold % to test (e.g. 4.0)"
+          },
+          "leverage": {
+            "type": "number",
+            "description": "Leverage multiplier to test (1.0–4.0)"
+          },
+          "base_position_pct": {
+            "type": "number",
+            "description": "Fraction of collateral to use as seed (0.01–0.50)"
+          },
+          "max_volatility_1h": {
+            "type": "number",
+            "description": "1h volatility filter threshold % to test"
+          },
+          "max_borrow_apr": {
+            "type": "number",
+            "description": "Borrow APR filter threshold % to test"
+          },
+          "btc_dominance_rise_threshold": {
+            "type": "number",
+            "description": "BTC dominance change filter threshold % to test"
+          },
+          "seed_usd": {
+            "type": "number",
+            "description": "Fixed seed per trade for comparison (default 1000)"
+          },
+          "compare_to_baseline": {
+            "type": "boolean",
+            "description": "If true, also run with current defaults and return a delta"
+          }
+        },
+        "required": []
+      },
+      "server": "http://localhost:8001/tools/backtest"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "update_config",
+      "description": "Propose and apply config parameter changes after validating them against hard bounds. Only allowed in paper_trading mode. Always call backtest first to verify the change improves performance.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "object",
+            "description": "Dict of parameter → new value (e.g. {\"take_profit_pct\": 7.0})",
+            "additionalProperties": true
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why this change is proposed — logged for audit trail"
+          }
+        },
+        "required": ["changes", "reason"]
+      },
+      "server": "http://localhost:8001/tools/update_config"
+    }
+  }
+]
