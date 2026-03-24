@@ -275,3 +275,28 @@ Guidelines for any agent using this skill in an interactive session:
 - **Call `get_position` after every completed transaction** and report what changed (new HF, new liquidation price, new collateral/debt).
 - **Surface carry cost before opening** — use `reserveRates[borrowAsset].borrowApy` to tell the user what they'll pay annually to hold the position. For a 3x BTC long at 3.86% USDC borrow APY, BTC needs to outperform ~3.86%/yr just to break even.
 - **Recommend wstETH loop for low carry** — the wstETH/WETH strategy earns staking yield on the collateral that largely offsets the borrow rate, making it the most cost-efficient long strategy.
+
+
+## Going autonomous
+
+For fully automated paper and live trading without a human in the loop, see the companion strategy repo:
+
+**[gutdraw/openclaw-aave-leverage-strategy](https://github.com/gutdraw/openclaw-aave-leverage-strategy)**
+
+It implements a complete autonomous bot that:
+- Runs on a schedule (hourly by default)
+- Generates signals from 1h/24h/7d price trends
+- Filters trades by volatility, borrow APR, and BTC dominance
+- Manages positions with TP/SL exits and health-factor defense
+- Supports both longs and shorts
+- Logs everything to `trades.jsonl`
+
+**Self-improvement loop** — the strategy bot also ships an `improve_server` (FastAPI on `localhost:8001`) that exposes three tools for Hermes to autonomously tune its own parameters:
+
+| Tool | What it does |
+|---|---|
+| `analyze_performance` | Read trade history, get per-signal stats and improvement hints |
+| `backtest` | Replay price history with alternative parameters |
+| `update_config` | Apply validated changes (paper mode only, hard bounds enforced) |
+
+See `SELF_IMPROVE.md` in this repo for the full loop architecture and Hermes system prompt.
