@@ -1,7 +1,7 @@
 ---
 name: aave-leverage-agent
 description: Open and manage leveraged DeFi positions on Aave v3 (Base) — BTC long, ETH long, shorts, and more. Non-custodial. Atomic. One transaction.
-version: 1.0.0
+version: 1.1.0
 author: gutdraw
 tags: [defi, aave, leverage, base, crypto, trading, flash-loan, uniswap]
 requires_mcp: aave-leverage
@@ -283,20 +283,65 @@ For fully automated paper and live trading without a human in the loop, see the 
 
 **[gutdraw/openclaw-aave-leverage-strategy](https://github.com/gutdraw/openclaw-aave-leverage-strategy)**
 
-It implements a complete autonomous bot that:
-- Runs on a schedule (hourly by default)
-- Generates signals from 1h/24h/7d price trends
-- Filters trades by volatility, borrow APR, and BTC dominance
-- Manages positions with TP/SL exits and health-factor defense
-- Supports both longs and shorts
-- Logs everything to `trades.jsonl`
+### Two-layer architecture
 
-**Self-improvement loop** — the strategy bot also ships an `improve_server` (FastAPI on `localhost:8001`) that exposes three tools for Hermes to autonomously tune its own parameters:
+The strategy is designed as two independent layers:
 
-| Tool | What it does |
+**Layer 1 — Bot (deterministic, always-on)**
+
+A plain Python loop that runs every 30 minutes with no AI inside it. Each cycle it:
+1. Fetches market data (CoinGecko, Coinbase/Kraken OHLCV, on-chain Aave state, F&G, funding rate)
+2. Scores signals via EMA(12/26)+RSI(14) on hourly candles (CoinGecko 3-timeframe as last-resort fallback)
+3. Applies 9 no-trade filters (volatility, borrow cost, BTC dominance, funding rate, F&G, volume, USDC utilization, liquidation cascade, position overlap)
+4. Executes a decision (open / hold / increase / close) via this MCP skill
+5. Appends a structured JSON entry to `trades.jsonl`
+
+The bot never calls an LLM. Execution cost is $4/month flat via x402 — decoupled from model choice.
+
+**Layer 2 — Agent (LLM-powered, periodic reviewer)**
+
+Any LLM (Claude, GPT, Hermes, or any multi-LLM framework) reads `trades.jsonl` and:
+- Diagnoses anomalies in P&L, HF, or signal behavior
+- Tunes config parameters (RSI thresholds, TP/SL %, filter floors) based on observed outcomes
+- Proposes strategy improvements as code/config changes for human review
+- Never touches the execution layer — reads logs only, suggests changes, human approves
+
+```
+Bot (EC2, always on)              Agent (LLM, periodic)
+┌────────────────────────┐        ┌──────────────────────────────┐
+│ fetch data             │        │ read trades.jsonl            │
+│ score signal           │        │ identify issues / gains      │
+│ call MCP (this skill)  │  ───►  │ propose config/code changes  │
+│ append trades.jsonl    │        │ human reviews → merges PR    │
+└────────────────────────┘        └──────────────────────────────┘
+         ▲                                      │
+         └────────── bot redeploys ─────────────┘
+```
+
+### Why x402 over self-inference
+
+The bot contains zero LLM inference — all decision logic is deterministic Python. The only
+paid external call is the MCP tool call to execute on Aave:
+
+| Approach | Monthly cost (30-min cycle) |
 |---|---|
-| `analyze_performance` | Read trade history, get per-signal stats and improvement hints |
-| `backtest` | Replay price history with alternative parameters |
-| `update_config` | Apply validated changes (paper mode only, hard bounds enforced) |
+| MCP + x402 monthly session | **$4.00 flat** |
+| LLM inference per cycle (GPT-4o) | ~$15/month |
+| LLM inference per cycle (Claude Opus) | ~$216/month |
 
-See `SELF_IMPROVE.md` in this repo for the full loop architecture and Hermes system prompt.
+A single Opus inference call costs more than the entire monthly MCP session. This makes it
+practical to run the most capable model as your Layer 2 reviewer without per-cycle inference
+cost dragging on P&L. The x402 session also requires no API key management, billing account,
+or quota monitoring — the bot wallet pays on-chain when needed.
+
+### Features
+
+- Runs on a 30-minute schedule (configurable)
+- OHLCV EMA+RSI primary signal (Coinbase → Kraken fallback); CoinGecko 3-timeframe last resort
+- 9 no-trade filters
+- Position sizing by signal confidence (full / half seed)
+- Position increase when signal upgrades (moderate → strong)
+- TP/SL, signal reversal exit, time-based exit, HF defense
+- Borrow-weighted avg entry price across tranches (correct P&L after increases)
+- Paper trading by default — identical log output, no chain calls
+- Append-only `trades.jsonl` — full audit trail per cycle and per trade
